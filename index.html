@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Snackbar</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+	</head>
+	<body>
+		<script src="bower_components/threejs/build/three.min.js"></script>
+		<script src="bower_components/threejs/examples/js/controls/VRControls.js"></script>
+		<script src="bower_components/threejs/examples/js/effects/VREffect.js"></script>
+    <script src="bower_components/webvr-polyfill/build/webvr-polyfill.js"></script>
+    <script src="bower_components/webvr-boilerplate/build/webvr-manager.js"></script>
+    <script src="js/renderer.js"></script>
+
+
+    <script src="js/renderer.js"></script>
+
+    <style>
+body, html {
+  padding: 0;
+  margin: 0;
+}
+    </style>
+
+		<script>
+window.addEventListener('load', init);
+
+var renderer = new Renderer();
+
+function init() {
+}
+
+
+function loop(timestamp) {
+  renderer.render(timestamp);
+  requestAnimationFrame(loop);
+}
+
+
+loop();
+
+		</script>
+	</body>
+</html>

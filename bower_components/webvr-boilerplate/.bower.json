@@ -1,0 +1,38 @@
+{
+  "name": "webvr-boilerplate",
+  "version": "0.1.2",
+  "homepage": "https://github.com/borismus/webvr-boilerplate",
+  "authors": [
+    "Boris Smus <boris@smus.com>"
+  ],
+  "description": "A starting point for web-based VR experiences that work in both Cardboard and Oculus.",
+  "main": "build/webvr-manager.js",
+  "keywords": [
+    "vr",
+    "webvr",
+    "webgl",
+    "threejs"
+  ],
+  "license": "Apache2",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "threejs": "*",
+    "webvr-polyfill": "*"
+  },
+  "_release": "0.1.2",
+  "_resolution": {
+    "type": "version",
+    "tag": "0.1.2",
+    "commit": "f2abdc886fc74d2e2e902b28e0b909c7c6561029"
+  },
+  "_source": "git://github.com/borismus/webvr-boilerplate.git",
+  "_target": "~0.1.2",
+  "_originalSource": "webvr-boilerplate",
+  "_direct": true
+}
