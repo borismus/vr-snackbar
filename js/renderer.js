@@ -6,6 +6,7 @@ function Renderer() {
   var renderer = new THREE.WebGLRenderer({antialias: true});
   renderer.setClearColor(0x000000, 0);
   renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
   container.appendChild(renderer.domElement);
 
   var controls = new THREE.VRControls(camera);
