@@ -109,9 +109,12 @@ Renderer.prototype.updateSnackbarPosition_ = function() {
   // Snackbar pitch in world coordinates.
   var snackbarWorldPitch = THREE.Math.degToRad(-30);
 
-  // If we're above the look threshold, position it low.
+  // If we're looking down, lock the snackbar to the camera.
   if (cameraPitch < THREE.Math.degToRad(-30)) {
     snackbarWorldPitch = cameraPitch;
+  }
+  if (cameraPitch > THREE.Math.degToRad(0)) {
+    snackbarWorldPitch = cameraPitch - THREE.Math.degToRad(30);
   }
 
   var snackbarPitch = cameraPitch - snackbarWorldPitch;
