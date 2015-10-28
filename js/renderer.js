@@ -79,10 +79,10 @@ Renderer.prototype.createSkybox_ = function() {
 };
 
 Renderer.prototype.createSnackbar_ = function() {
-  var aspect = 512 / 70;
-  var width = 1;
+  var aspect = 740 / 144;
+  var width = .7;
 
-  var map = THREE.ImageUtils.loadTexture('img/snackbar.png');
+  var map = THREE.ImageUtils.loadTexture('img/snackbar.svg');
   var material = new THREE.MeshBasicMaterial({map: map, color: 0xffffff});
   var geometry = new THREE.PlaneGeometry(width, width / aspect);
   var mesh = new THREE.Mesh(geometry, material);
