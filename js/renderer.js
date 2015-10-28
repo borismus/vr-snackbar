@@ -101,20 +101,22 @@ Renderer.prototype.createScene_ = function() {
 };
 
 Renderer.prototype.updateSnackbarPosition_ = function() {
+  var MIN_PITCH = -30;
+  var MAX_PITCH = 35;
   // Get camera pitch.
   var look = new THREE.Vector3(0, 0, -1);
   look.applyQuaternion(this.camera.quaternion);
   var cameraPitch = Math.atan2(look.y, Math.sqrt(look.x*look.x + look.z*look.z));
 
   // Snackbar pitch in world coordinates.
-  var snackbarWorldPitch = THREE.Math.degToRad(-30);
+  var snackbarWorldPitch = THREE.Math.degToRad(MIN_PITCH);
 
   // If we're looking down, lock the snackbar to the camera.
-  if (cameraPitch < THREE.Math.degToRad(-30)) {
+  if (cameraPitch < THREE.Math.degToRad(MIN_PITCH)) {
     snackbarWorldPitch = cameraPitch;
   }
-  if (cameraPitch > THREE.Math.degToRad(0)) {
-    snackbarWorldPitch = cameraPitch - THREE.Math.degToRad(30);
+  if (cameraPitch > THREE.Math.degToRad(MIN_PITCH + MAX_PITCH)) {
+    snackbarWorldPitch = cameraPitch - THREE.Math.degToRad(MAX_PITCH);
   }
 
   var snackbarPitch = cameraPitch - snackbarWorldPitch;
