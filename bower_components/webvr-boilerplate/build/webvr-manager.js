@@ -105,9 +105,7 @@ ButtonManager.prototype.setMode = function(mode, isVRCompatible) {
     case Modes.NORMAL:
       this.fsButton.style.display = 'block';
       this.fsButton.src = this.ICONS.fullscreen;
-      //this.vrButton.style.display = (isVRCompatible ? 'block' : 'none');
-      // For now, just disable direct-to-VR mode.
-      this.vrButton.style.display = 'none';
+      this.vrButton.style.display = (isVRCompatible ? 'block' : 'none');
       this.backButton.style.display = 'none';
       break;
     case Modes.MAGIC_WINDOW:
@@ -134,6 +132,8 @@ ButtonManager.prototype.setMode = function(mode, isVRCompatible) {
 ButtonManager.prototype.setVisibility = function(isVisible) {
   this.isVisible = isVisible;
   this.fsButton.style.display = isVisible ? 'block' : 'none';
+  this.vrButton.style.display = isVisible ? 'block' : 'none';
+  this.backButton.style.display = isVisible ? 'block' : 'none';
 };
 
 ButtonManager.prototype.createClickHandler_ = function(eventName) {
@@ -272,9 +272,9 @@ function CardboardDistorter(renderer) {
   BarrelDistortion.rightCenter = {type: 'v2', value: new THREE.Vector2(right.x, right.y)};
 
   // Allow custom background colors if this global is set.
-  if (window.WEBVR_BACKGROUND_COLOR) {
+  if (WebVRConfig.DISTORTION_BGCOLOR) {
     BarrelDistortion.uniforms.background =
-      {type: 'v4', value: window.WEBVR_BACKGROUND_COLOR};
+      {type: 'v4', value: WebVRConfig.DISTORTION_BGCOLOR};
   }
 
   var shaderPass = new ShaderPass(BarrelDistortion);
@@ -353,10 +353,9 @@ module.exports = CardboardDistorter;
 
 var Util = require('./util.js');
 
-// Width, height and bevel measurements done on real iPhones.
+// Display width, display height and bevel measurements done on real phones.
 // Resolutions from http://www.paintcodeapp.com/news/ultimate-guide-to-iphone-resolutions
-// Note: iPhone pixels are not square, so relying on diagonal is not enough.
-var Devices = {
+var iOSDevices = {
   iPhone5: new Device({
     width: 640,
     height: 1136,
@@ -380,6 +379,39 @@ var Devices = {
   })
 };
 
+var AndroidDevices = {
+  Nexus5: new Device({
+    userAgentRegExp: /Nexus 5/,
+    widthMm: 62,
+    heightMm: 110,
+    bevelMm: 4
+  }),
+  GalaxyS3: new Device({
+    userAgentRegExp: /GT-I9300/,
+    widthMm: 60,
+    heightMm: 106,
+    bevelMm: 5
+  }),
+  GalaxyS4: new Device({
+    userAgentRegExp: /GT-I9505/,
+    widthMm: 62.5,
+    heightMm: 111,
+    bevelMm: 4
+  }),
+  GalaxyS5: new Device({
+    userAgentRegExp: /SM-G900F/,
+    widthMm: 66,
+    heightMm: 113,
+    bevelMm: 5
+  }),
+  GalaxyS6: new Device({
+    userAgentRegExp: /SM-G920/,
+    widthMm: 63.5,
+    heightMm: 114,
+    bevelMm: 3.5
+  }),
+};
+
 var Enclosures = {
   CardboardV1: new CardboardEnclosure({
     ipdMm: 61,
@@ -401,6 +433,10 @@ function DeviceInfo() {
   this.device = this.determineDevice_();
   this.enclosure = Enclosures.CardboardV1;
 }
+
+DeviceInfo.prototype.getDevice = function() {
+  return this.device;
+};
 
 /**
  * Gets the coordinates (in [0, 1]) for the left eye.
@@ -436,10 +472,14 @@ DeviceInfo.prototype.getRightEyeCenter = function() {
 
 DeviceInfo.prototype.determineDevice_ = function() {
   // Only support iPhones.
-  if (!Util.isIOS()) {
-    return null;
+  if (Util.isIOS()) {
+    return this.determineIPhone_();
+  } else {
+    return this.determineAndroid_();
   }
+};
 
+DeviceInfo.prototype.determineIPhone_ = function() {
   // On iOS, use screen dimensions to determine iPhone/iPad model.
   var userAgent = navigator.userAgent || navigator.vendor || window.opera;
 
@@ -450,8 +490,8 @@ DeviceInfo.prototype.determineDevice_ = function() {
   var pixelHeight = height * window.devicePixelRatio;
 
   // Match the screen dimension to the correct device.
-  for (var id in Devices) {
-    var device = Devices[id];
+  for (var id in iOSDevices) {
+    var device = iOSDevices[id];
     // Expect an exact match on width.
     if (device.width == pixelWidth || device.width == pixelHeight) {
       console.log('Detected iPhone: %s', id);
@@ -459,11 +499,28 @@ DeviceInfo.prototype.determineDevice_ = function() {
       return device;
     }
   }
+  // This should never happen.
+  console.error('Unable to detect iPhone type.');
+  return null;
+};
+
+DeviceInfo.prototype.determineAndroid_ = function() {
+  // Do a userAgent match against all of the known Android devices.
+  for (var id in AndroidDevices) {
+    var device = AndroidDevices[id];
+    // Does it match?
+    if (navigator.userAgent.match(device.userAgentRegExp)) {
+      console.log('Detected Android: %s', id);
+      return device;
+    }
+  }
+  // No device matched.
   return null;
 };
 
 
 function Device(params) {
+  this.userAgentRegExp = params.userAgentRegExp;
   this.width = params.width;
   this.height = params.height;
   this.widthMm = params.widthMm;
@@ -546,6 +603,7 @@ module.exports = Emitter;
 
 var WebVRManager = require('./webvr-manager.js');
 
+window.WebVRConfig = window.WebVRConfig || {};
 window.WebVRManager = WebVRManager;
 
 },{"./webvr-manager.js":10}],6:[function(require,module,exports){
@@ -605,23 +663,56 @@ function RotateInstructions() {
   s.bottom = 0;
   s.left = 0;
   s.backgroundColor = 'gray';
-  s.backgroundRepeat = 'no-repeat';
-  s.backgroundPosition = '50% 20%';
-  s.backgroundImage = 'url(' + this.icon + ')';
+  s.fontFamily = 'sans-serif';
+
+  var img = document.createElement('img');
+  img.src = this.icon;
+  var s = img.style;
+  s.marginLeft = '25%';
+  s.marginTop = '25%';
+  s.width = '50%';
+  overlay.appendChild(img);
 
   var text = document.createElement('div');
   var s = text.style;
   s.textAlign = 'center';
-  s.fontSize = '24px';
-  s.fontFamily = 'sans-serif';
-  s.position = 'fixed';
-  s.bottom = 0;
-  s.marginBottom = '5%';
-  s.marginLeft = 'auto';
-  s.marginRight = 'auto';
-  s.width = '100%';
+  s.fontSize = '16px';
+  s.lineHeight = '24px';
+  s.margin = '24px 25%';
+  s.width = '50%';
   text.innerHTML = 'Place your phone into your Cardboard viewer.';
   overlay.appendChild(text);
+
+  var snackbar = document.createElement('div');
+  var s = snackbar.style;
+  s.backgroundColor = '#CFD8DC';
+  s.position = 'fixed';
+  s.bottom = 0;
+  s.width = '100%';
+  s.height = '48px';
+  s.padding = '14px 24px';
+  s.boxSizing = 'border-box';
+  s.color = '#656A6B';
+  overlay.appendChild(snackbar);
+
+  var snackbarText = document.createElement('div');
+  snackbarText.style.float = 'left';
+  snackbarText.innerHTML = 'No Cardboard viewer?';
+
+  var snackbarButton = document.createElement('a');
+  snackbarButton.href = 'https://www.google.com/get/cardboard/get-cardboard/';
+  snackbarButton.innerHTML = 'get one';
+  var s = snackbarButton.style;
+  s.float = 'right';
+  s.fontWeight = 600;
+  s.textTransform = 'uppercase';
+  s.borderLeft = '1px solid gray';
+  s.paddingLeft = '24px';
+  s.textDecoration = 'none';
+  s.color = '#656A6B';
+
+  snackbar.appendChild(snackbarText);
+  snackbar.appendChild(snackbarButton);
 
   this.overlay = overlay;
   this.text = text;
@@ -633,13 +724,17 @@ function RotateInstructions() {
 RotateInstructions.prototype.show = function() {
   this.overlay.style.display = 'block';
 
-  var sText = this.text.style;
-  var s = this.overlay.style;
+  var img = this.overlay.querySelector('img');
+  var s = img.style;
 
   if (Util.isLandscapeMode()) {
-    s.backgroundSize = '30%';
+    s.width = '20%';
+    s.marginLeft = '40%';
+    s.marginTop = '3%';
   } else {
-    s.backgroundSize = '60%';
+    s.width = '50%';
+    s.marginLeft = '25%';
+    s.marginTop = '25%';
   }
 };
 
@@ -702,8 +797,7 @@ Util.isIFrame = function() {
   }
 };
 
-Util.appendQueryParameter = function(key, value) {
-  var url = window.location.href;
+Util.appendQueryParameter = function(url, key, value) {
   // Determine delimiter based on if the URL already GET parameters in it.
   var delimiter = (url.indexOf('?') < 0 ? '?' : '&');
   url += delimiter + key + '=' + value;
@@ -817,12 +911,13 @@ module.exports = getWakeLock();
  * limitations under the License.
  */
 
-var Wakelock = require('./wakelock.js');
+var ButtonManager = require('./button-manager.js');
 var CardboardDistorter = require('./cardboard-distorter.js');
+var DeviceInfo = require('./device-info.js');
 var Modes = require('./modes.js');
 var RotateInstructions = require('./rotate-instructions.js');
 var Util = require('./util.js');
-var ButtonManager = require('./button-manager.js');
+var Wakelock = require('./wakelock.js');
 
 /**
  * Helper for getting in and out of VR mode.
@@ -857,30 +952,45 @@ function WebVRManager(renderer, effect, params) {
 
   this.isVRCompatible = false;
   this.isFullscreenDisabled = !!Util.getQueryParameter('no_fullscreen');
+  this.startMode = Modes.NORMAL;
+  var startModeParam = parseInt(Util.getQueryParameter('start_mode'));
+  if (!isNaN(startModeParam)) {
+    this.startMode = startModeParam;
+  }
 
   if (hideButton) {
     this.button.setVisibility(false);
   }
 
+  var deviceInfo = new DeviceInfo();
+
   // Check if the browser is compatible with WebVR.
   this.getDeviceByType_(HMDVRDevice).then(function(hmd) {
     // Activate either VR or Immersive mode.
-    if (window.WEBVR_FORCE_DISTORTION) {
+    if (WebVRConfig.FORCE_DISTORTION) {
       this.distorter.setActive(true);
       this.isVRCompatible = true;
     } else if (hmd) {
       this.isVRCompatible = true;
-      // Only enable distortion if we are dealing using the polyfill and this is iOS.
-      if (hmd.deviceName.indexOf('webvr-polyfill') == 0 && Util.isIOS()) {
+      // Only enable distortion if we are dealing using the polyfill, we have a
+      // perfect device match, and it's not prevented via configuration.
+      if (hmd.deviceName.indexOf('webvr-polyfill') == 0 && deviceInfo.getDevice() &&
+          !WebVRConfig.PREVENT_DISTORTION) {
         this.distorter.setActive(true);
       }
     }
     // Set the right mode.
-    if (this.isFullscreenDisabled) {
-      this.normalToMagicWindow();
-      this.setMode_(Modes.MAGIC_WINDOW);
-    } else {
-      this.setMode_(Modes.NORMAL);
+    switch (this.startMode) {
+      case Modes.MAGIC_WINDOW:
+        this.normalToMagicWindow();
+        this.setMode_(Modes.MAGIC_WINDOW);
+        break;
+      case Modes.VR:
+        this.anyModeToVR();
+        this.setMode_(Modes.VR);
+        break;
+      default:
+        this.setMode_(Modes.NORMAL);
     }
     this.button.on('fs', this.onFSClick_.bind(this));
     this.button.on('vr', this.onVRClick_.bind(this));
@@ -944,9 +1054,6 @@ WebVRManager.prototype.render = function(scene, camera, timestamp) {
       this.renderer.render(scene, camera);
     }
   }
-  if (this.input && this.input.setAnimationFrameTime) {
-    this.input.setAnimationFrameTime(timestamp);
-  }
 };
 
 
@@ -955,7 +1062,7 @@ WebVRManager.prototype.setMode_ = function(mode) {
   this.mode = mode;
   this.button.setMode(mode, this.isVRCompatible);
 
-  if (this.mode == Modes.VR && Util.isLandscapeMode()) {
+  if (this.mode == Modes.VR && Util.isLandscapeMode() && Util.isMobile()) {
     // In landscape mode, temporarily show the "put into Cardboard"
     // interstitial. Otherwise, do the default thing.
     this.rotateInstructions.showTemporarily(3000);
@@ -973,7 +1080,9 @@ WebVRManager.prototype.onFSClick_ = function() {
       // TODO: Remove this hack when iOS has fullscreen mode.
       // If this is an iframe on iOS, break out and open in no_fullscreen mode.
       if (Util.isIOS() && Util.isIFrame()) {
-        var url = Util.appendQueryParameter('no_fullscreen', 'true');
+        var url = window.location.href;
+        url = Util.appendQueryParameter(url, 'no_fullscreen', 'true');
+        url = Util.appendQueryParameter(url, 'start_mode', Modes.MAGIC_WINDOW);
         top.location.href = url;
         return;
       }
@@ -995,6 +1104,15 @@ WebVRManager.prototype.onFSClick_ = function() {
  *
  */
 WebVRManager.prototype.onVRClick_ = function() {
+  // TODO: Remove this hack when iOS has fullscreen mode.
+  // If this is an iframe on iOS, break out and open in no_fullscreen mode.
+  if (this.mode == Modes.NORMAL && Util.isIOS() && Util.isIFrame()) {
+    var url = window.location.href;
+    url = Util.appendQueryParameter(url, 'no_fullscreen', 'true');
+    url = Util.appendQueryParameter(url, 'start_mode', Modes.VR);
+    top.location.href = url;
+    return;
+  }
   this.anyModeToVR();
   this.setMode_(Modes.VR);
 };
@@ -1003,20 +1121,24 @@ WebVRManager.prototype.onVRClick_ = function() {
  * Back button was clicked.
  */
 WebVRManager.prototype.onBackClick_ = function() {
+  /*
   switch (this.mode) {
     case Modes.MAGIC_WINDOW:
+      */
       if (this.isFullscreenDisabled) {
         window.history.back();
       } else {
         this.anyModeToNormal();
         this.setMode_(Modes.NORMAL);
       }
+      /*
       break;
     case Modes.VR:
       this.vrToMagicWindow();
       this.setMode_(Modes.MAGIC_WINDOW);
       break;
   }
+  */
 };
 
 /**
@@ -1081,7 +1203,7 @@ WebVRManager.prototype.onOrientationChange_ = function(e) {
 WebVRManager.prototype.updateRotateInstructions_ = function() {
   this.rotateInstructions.disableShowTemporarily();
   // In portrait VR mode, tell the user to rotate to landscape.
-  if (this.mode == Modes.VR && !Util.isLandscapeMode()) {
+  if (this.mode == Modes.VR && !Util.isLandscapeMode() && Util.isMobile()) {
     this.rotateInstructions.show();
   } else {
     this.rotateInstructions.hide();
@@ -1154,4 +1276,4 @@ WebVRManager.prototype.exitFullscreen_ = function() {
 
 module.exports = WebVRManager;
 
-},{"./button-manager.js":1,"./cardboard-distorter.js":2,"./modes.js":6,"./rotate-instructions.js":7,"./util.js":8,"./wakelock.js":9}]},{},[5]);
+},{"./button-manager.js":1,"./cardboard-distorter.js":2,"./device-info.js":3,"./modes.js":6,"./rotate-instructions.js":7,"./util.js":8,"./wakelock.js":9}]},{},[5]);
